@@ -1,7 +1,9 @@
 import express, { response } from "express";
 
 //we are going to use this as middleware
-import { query, validationResult } from "express-validator";
+import { query, validationResult, body, matchedData, checkSchema } from "express-validator";
+
+import { createUserValidationSchema } from "./utils/validationSchema.mjs"
 
 const app = express();
 
@@ -62,12 +64,18 @@ app.get(
 //VALIDATION
 app.get(
   "/api/users/",
-  query("filter").isString().notEmpty(),
+  query("filter")
+    .isString()
+    .notEmpty()
+    .withMessage("Must not be empty")
+    .isLength({ min: 3, max: 10 })
+    .withMessage("Must be at least 3-10 characters"), //This is called Validation chain
   (request, response) => {
     // console.log(request.query);
     // console.log(request["express-validator#contexts"]);
 
-    const result = validationResult(request); //It will grab the field and and validate errors 
+    const result = validationResult(request); //It will grab the field and and validate errors
+    console.log(result);
     const {
       query: { filter, value },
     } = request;
@@ -106,20 +114,60 @@ app.use(loggingMiddleware, (request, response, next) => {
   next();
 });
 
-//POST Request
-app.post("/api/users/", (request, response) => {
-  console.log(request.body);
-  const { body } = request;
-  const newUser = {
-    //WE WANT TO GET THE LAST ELEMENT FROM THE ARRAY MOCKUSERS
-    id: mockUsers[mockUsers.length - 1].id + 1,
-    ...body,
-  };
+//POST Request Validation
+app.post(
+  "/api/users/",
+  // [body("username")
+  //   .notEmpty()
+  //   .withMessage("username cannot be empty")
+  //   .isLength({ min: 5, max: 32 })
+  //   .withMessage("Username must be 5-32 characters")
+  //   .isString()
+  //   .withMessage("username must be string"),
 
-  mockUsers.push(newUser);
-  return response.status(201).send(newUser);
-  // return response.send(200);
-});
+  // body("displayName").notEmpty()
+  
+  // ],
+
+  checkSchema(createUserValidationSchema),
+
+
+  (request, response) => {
+    const result = validationResult(request);
+    console.log(result);
+
+    if(!result.isEmpty()) return response.status(400).send({errors : result.array()});
+
+    const data = matchedData(request);
+
+    // console.log(data);
+    const { body } = request;
+    const newUser = {
+      //WE WANT TO GET THE LAST ELEMENT FROM THE ARRAY MOCKUSERS
+      id: mockUsers[mockUsers.length - 1].id + 1,
+      // ...body,
+      ...data,
+    };
+
+    mockUsers.push(newUser);
+    return response.status(201).send(newUser);
+    // return response.send(200);
+  }
+);
+// //POST Request
+// app.post("/api/users/", (request, response) => {
+//   console.log(request.body);
+//   const { body } = request;
+//   const newUser = {
+//     //WE WANT TO GET THE LAST ELEMENT FROM THE ARRAY MOCKUSERS
+//     id: mockUsers[mockUsers.length - 1].id + 1,
+//     ...body,
+//   };
+
+//   mockUsers.push(newUser);
+//   return response.status(201).send(newUser);
+//   // return response.send(200);
+// });
 
 //GET
 // app.get("/api/users/:id", (request, response) => {
