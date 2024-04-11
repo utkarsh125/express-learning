@@ -1,0 +1,181 @@
+Sessions represent the duration of a user on a website, by default HTTP is stateless. One common application of Sessions is to manage user authentication...
+
+First thing we need is `express-session`
+
+```js
+npm install express-session
+```
+
+```js
+import session from "express-session";
+app.use(session(
+	{
+		secret: 'Utkarsh the dev',
+		saveUninitialized: false,
+		resave: false,
+		cookie: {
+			maxAge: 60000*60, //ONE HOUR LOGIN FOR OUR USER
+		}
+	}
+)); //must be before any endpoint like routers
+```
+
+
+`app.use(session(...)`:  This line mounts the session middleware globally to your Express application, meaning it will be applied to all routes.
+
+`{ secret: 'Utkarsh the dev', saveUninitialized: false } `: This is the configuration object for the session middleware. Here's what each property means
+
+- `secret`: This is a string used to sign the session ID cookie. It's important because it helps prevent tampering with the session data. In the example, the secret is 'Utkarsh the Dev'. However, as suggested, it's better to use a more complex and random string for better security - `crypto library`
+
+- `saveUninitialized`:  This option determines whether a session that is "uninitialized" (i.e., new but not modified) should be saved to the store. In the code, it's set to `false`, meaning sessions won't be saved for new and unmodified sessions until they're modified.
+
+- `resave`: This middleware determines whether the session should be saved back to the session store even if the session was never modified during the request.
+
+- `cookie`: This option allows you to configure properties related to the session cookie. In this case, `maxAge` is set to `60000 * 60`, which means the session cookie will expire after one hour (60 minutes * 60 seconds). This sets the duration for which the user will remain logged in.
+
+**Defining the `GET` Request**
+```js
+app.get('/', (request, response) => {
+
+    console.log(request.session);
+    console.log(request.session.id);
+    response.cookie("hello", "world", { maxAge: 30000, signed: true })
+    response.status(201).send({msg: "Hello Session"})
+
+})
+```
+
+You will see something like this on the console
+
+```js
+Session {
+  cookie: {
+    path: '/',
+    _expires: 2024-04-09T15:06:08.350Z,
+    originalMaxAge: 3600000,
+    httpOnly: true
+  }
+}
+nPhc7rvVv0O0BIUk_vPkkZ5rshvbUUS8 //Session ID: Changes on each boot
+```
+
+To capture the `session.id` you need to modify the session data object
+
+```js
+	request.session.visited: true;
+```
+
+On `GET` you will be looking at the same session ID so that's how you lock it
+`629bEbbaGkGxfr4N43U7eL5jvhHu0FYB`
+`629bEbbaGkGxfr4N43U7eL5jvhHu0FYB`
+
+**sessionStore** stores the session locally using some data structure --> more will be covered in `passport.js`
+
+### PART 2: Session Auth
+
+To start off make a `POST` method
+```js
+app.post("/api/auth", (request, response) => {
+  const {
+    body: { username, password },
+  } = request;
+  const findUser = mockUsers.find((user) => user.username === username);
+  if (!findUser || findUser.password !== password) {
+    return response.status(401).send({ msg: "BAD CREDENTIALS!" });
+  }
+  request.session.user = findUser;
+  //this should modify the session object
+  //and that will have express-session set a cookie
+  //and send it back to the browser/client as a response
+  //now the server has that cookie, and now they can use that cookie
+  //to send it to the server, and the server will know who's cookie it is!
+  return response.status(200).send(findUser);
+});
+```
+
+On sending `POST` to `/api/auth` we get something like this **IF CORRECT USERNAME AND PASSWORD ARE GIVEN FROM `mockUsers`**
+![[Pasted image 20240409221919.png]]
+
+Else it would be like this
+![[Pasted image 20240409221940.png]]
+
+
+### User Authentication Status Endpoint
+
+```js
+app.get('/api/auth/status', (request, response) => {
+    request.sessionStore.get(request.session.id, (err, session) => {
+        console.log(session);
+    })
+    return request.session.user
+    ? response.status(200).send(request.session.user)
+    : response.status(401).send({msg: "Not Authenticated"});
+})
+```
+
+This endpoint `/api/auth/status` is responsible for retrieving the authentication status of a user. Upon receiving a GET request, it attempts to retrieve the session object associated with the user's session ID from the session store. If successful, it logs the session object to the console. It then checks if there is a `user` property in the session object. If the property exists, it indicates that the user is authenticated, and it returns a response with status 200 containing the user object. Otherwise, if the `user` property is not found in the session object, it indicates that the user is not authenticated, and it returns a response with status 401 along with a message indicating the user is not authenticated.
+
+- **Input**: 
+  - Request Type: GET
+
+- **Output**:
+  - If user is authenticated:
+    - Response Status: 200
+    - Response Body: JSON object representing the authenticated user.
+  - If user is not authenticated:
+    - Response Status: 401
+    - Response Body: JSON object with a message indicating the user is not authenticated.
+
+This endpoint provides a means for clients to check whether a user is currently authenticated or not.
+
+### Cart Management Endpoints
+
+```js
+app.post("/api/cart", (request, response) => {
+  if (!request.session.user) return response.sendStatus(401);
+  const { body: item } = request;
+  const { cart } = request.session;
+  
+  if (cart) {
+    cart.push(item);
+  } else {
+    request.session.cart = [item];
+  }
+  return response.status(201).send(item);
+});
+app.get("/api/cart", (request, response) => {
+  if (!request.session.user) return response.sendStatus(401);
+  return response.send(request.session.cart ?? []); //if cart is undefined then return empty array
+});
+```
+
+#### POST /api/cart
+
+This endpoint `/api/cart` is responsible for adding items to the user's cart. Upon receiving a POST request, it first checks if the user is authenticated by verifying the presence of the `user` property in the session object. If the user is not authenticated, it returns a response with status 401. If the user is authenticated, it extracts the item from the request body. It then checks if the user already has a cart stored in the session. If a cart exists, it adds the item to the cart. If not, it initializes the cart with the current item. Finally, it returns a response with status 201 containing the added item.
+
+- **Input**: 
+  - Request Type: POST
+  - Request Body: JSON object representing the item to be added to the cart.
+
+- **Output**:
+  - Response Status: 201
+  - Response Body: JSON object representing the added item.
+
+#### GET /api/cart
+
+This endpoint `/api/cart` is responsible for retrieving the items in the user's cart. Upon receiving a GET request, it first checks if the user is authenticated by verifying the presence of the `user` property in the session object. If the user is not authenticated, it returns a response with status 401. If the user is authenticated, it retrieves the cart from the session object. If the cart exists, it returns a response with status 200 containing the cart items. If the cart is undefined, it returns an empty array to indicate that the cart is empty.
+
+- **Input**: 
+  - Request Type: GET
+
+- **Output**:
+  - If cart is not empty:
+    - Response Status: 200
+    - Response Body: JSON array representing the items in the cart.
+  - If cart is empty:
+    - Response Status: 200
+    - Response Body: Empty JSON array.
+
+These endpoints facilitate the management of a user's shopping cart, allowing users to add items to their cart and view the contents of their cart.
+
+

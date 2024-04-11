@@ -21,6 +21,17 @@ router.get(
     .isLength({ min: 3, max: 10 })
     .withMessage("Must be at least 3-10 characters"), //This is called Validation chain
   (request, response) => {
+
+    console.log(request.session);
+    console.log(request.session.id);
+    (request.sessionStore.get(request.session.id, (err, sessionData) =>{
+      if(err){
+          console.log(err);
+          throw err;
+      }
+      console.log(sessionData);
+  }))
+
     const result = validationResult(request); //It will grab the field and and validate errors
     console.log(result);
     const {

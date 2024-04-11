@@ -1,0 +1,116 @@
+Passport is middleware for Node.js that makes it easy to implement authentication and authorization. 
+`npm install passport passport-local`
+```js
+import { Passport } from "passport";
+//before routes
+app.use(passport.initialize());
+```
+
+**User Validation using `passport.js`**
+```js
+passport.use(
+  new Strategy((username, password, done) => {
+    //main use is to validate the user
+    try {
+      const findUser = mockUsers.find((user) => user.username === username);
+      if (!findUser) throw new Error("User not found!");
+      if (findUser.password !== password)
+        throw new Error("Invalid credentials.");
+      done(null, findUser);
+    } catch (err) { //any errors will be catched by this catch block
+      //we want to call the done function
+      done(err, null);
+    }
+  }) //takes 3 arguments
+);
+```
+
+1. `passport.use(...)`:
+   - This is how Passport.js initializes and uses a new authentication strategy. In this case, it's using the `Strategy` constructor to create a new instance of an authentication strategy.
+
+2. `new Strategy((username, password, done) => {...})`:
+   - This line instantiates a new authentication strategy. It takes a callback function as an argument, which is executed when a user tries to authenticate.
+
+3. `(username, password, done) => {...}`:
+   - This is the callback function that is passed to the `Strategy` constructor. It takes three parameters: `username`, `password`, and `done`.
+   - Inside this function, the actual authentication logic is implemented.
+
+4. Inside the callback function:
+   - `const findUser = mockUsers.find((user) => user.username === username);`:
+     - This line tries to find a user in a mock user database (`mockUsers`) based on the provided `username`.
+   - `if (!findUser) throw new Error("User not found!");`:
+     - If no user is found with the provided `username`, it throws an error indicating that the user was not found.
+   - `if (findUser.password !== password) throw new Error("Invalid credentials.");`:
+     - If the password provided by the user does not match the password stored in the database for the found user, it throws an error indicating invalid credentials.
+   - `done(null, findUser);`:
+     - If the user is found and the credentials are valid, this line invokes the `done` callback with `null` as the error and the found user object as the second argument.
+   - `catch (err) {...}`:
+     - This catch block handles any errors that occur during the authentication process.
+   - `done(err, null);`:
+     - If an error occurs during authentication, this line invokes the `done` callback with the error object as the first argument and `null` as the second argument.
+
+In summary, this code sets up an authentication strategy using Passport.js, where it checks if a user exists in a mock user database and validates their credentials (username and password). If successful, it passes the user object to the `done` callback; otherwise, it passes an error object.
+
+**What is `done`?**
+
+In the context of Passport.js and authentication middleware in general, `done` is a callback function provided by Passport.js to indicate the completion of an authentication process.
+
+The `done` function is typically invoked with parameters that convey the result of the authentication attempt. It usually takes two or three arguments:
+
+1. The first argument is an error object. If authentication fails due to an error, this argument should be populated with the error object. If authentication succeeds, this argument should be `null`.
+    
+2. The second argument is the user object. If authentication succeeds, this argument should contain the user object representing the authenticated user. If authentication fails, this argument should be `false` or `null`.
+    
+3. Optionally, some strategies may use a third argument for additional options or data.
+    
+
+Here's a general usage of `done`:
+```js
+done(error, user, info);
+```
+
+##### User Serialization and Deserialization
+
+
+**`serializeUser`**: This function determines which data of the user object should be stored in the session. Typically, you'll want to store only a unique identifier for the user (like their user ID) in the session. This helps keep the session small, which is important for performance reasons.
+
+**`deserializeUser`**: This function is responsible for retrieving the user's data from the session. It takes the unique identifier stored in the session (e.g., user ID) and fetches the corresponding user record from the database or any other data source.
+
+
+```js
+//Inside local-strategy.mjs
+passport.serializeUser((user, done) => {
+  console.log(`Inside Serialize User`);
+  console.log(user);
+  done(null, user.id);
+});
+
+passport.deserializeUser((id, done) => {  
+  console.log(`Inside Deserializer`);
+  console.log(`Deserializing User ID: ${id}`);
+  //search for the user either in the database or the array that we've created
+  try {
+    const findUser = mockUsers.find((user) => user.id === id);
+    if (!findUser) throw new Error("User not found!");
+    done(null, user);
+    //done(null, user) is used to signal successful authentication
+    //and pass the authenticated user to the next step in the process.
+  } catch (err) { //if the user is NOT found
+    done(err, null);
+  }
+});
+```
+
+You will see something like this on the console.
+```js
+Running on PORT 3000
+Username: utkarsh
+Password: hello123
+Inside Serialize User
+{
+  id: 1,
+  username: 'utkarsh',
+  displayName: 'Utkarsh',
+  password: 'hello123'
+}
+```
