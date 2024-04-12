@@ -6,9 +6,30 @@ import routes from "./routes/index.mjs";
 import session from "express-session";
 import { mockUsers } from "./utils/constants.mjs";
 import passport from "passport";
+import mongoose from "mongoose";
 import "./strategies/local-strategy.mjs";
 
 const app = express();
+
+const password = "passwordgen4";
+
+// mongoose.connect("mongodb://localhost:27017")
+//it uses this port by default, but
+//you must specify it if it is different for your case
+
+mongoose
+  // .connect("mongodb://localhost/express-learning")
+  .connect(`mongodb+srv://utkarshtest:${password}@cluster0.bdjum7w.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`)
+  .then(() => {
+    console.log("Connected to Database");
+  })
+  .catch((err) => {
+    console.error(`Error connecting to the database: ${err}`);
+  });
+
+
+
+  
 
 app.use(express.json());
 app.use(cookieParser("helloworld"));
@@ -25,25 +46,29 @@ app.use(
 );
 
 app.use(passport.initialize());
+app.use(passport.session());
 
 app.use(routes);
 
-app.post(
-  "/api/auth",
-  passport.authenticate("local"),
-  (request, response) => {
-    response.sendStatus(200);
-  }
-);
+app.post("/api/auth", passport.authenticate("local"), (request, response) => {
+  response.sendStatus(200);
+});
 
-app.get("/api/auth/status", (request, response)=>{
-  console.log(`Inside /auth/status endpoint`)
+app.get("/api/auth/status", (request, response) => {
+  console.log(`Inside /auth/status endpoint`);
   console.log(request.user);
+  console.log(request.session);
 
-  if(request.user) return response.send(user);
-  return response.sendStatus(401);
+  return request.user ? response.send(request.user) : response.sendStatus(401);
+});
 
-  return request.user ? response.send(request.user) : response.sendStatus(200);
+app.post("/api/auth/logout", (request, response) => {
+  if (!request.user) return response.sendStatus(401);
+
+  request.logout((err) => {
+    if (err) return response.sendStatus(400);
+    response.send(200);
+  });
 });
 
 const PORT = process.env.PORT || 3000;
@@ -82,6 +107,9 @@ app.post("/api/auth", (request, response) => {
 });
 
 app.get("/api/auth/status", (request, response) => {
+  console.log(`Inside /auth/status endpoint`);
+  console.log(request.user);
+
   request.sessionStore.get(request.session.id, (err, session) => {
     console.log(session);
   });

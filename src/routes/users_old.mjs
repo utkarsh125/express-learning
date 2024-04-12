@@ -9,7 +9,6 @@ import {
 import { mockUsers } from "../utils/constants.mjs";
 import { createUserValidationSchema } from "../utils/validationSchema.mjs";
 import { resolveIndexUserById } from "../utils/middlewares.mjs";
-import { User } from "../mongoose/schemas/user.mjs";
 
 const router = Router(); //Defining the router
 
@@ -54,19 +53,26 @@ router.get("/api/users/:id", resolveIndexUserById, (request, response) => {
 });
 
 router.post(
-  "/api/users/", async (request, response) => {
+  "/api/users/",
+  checkSchema(createUserValidationSchema),
+  (request, response) => {
+    const result = validationResult(request);
+    console.log(result);
+    if (!result.isEmpty())
+      return response.status(400).send({ errors: result.array() });
+    const data = matchedData(request);
+    // console.log(data);
+    const { body } = request;
+    const newUser = {
+      //WE WANT TO GET THE LAST ELEMENT FROM THE ARRAY MOCKUSERS
+      id: mockUsers[mockUsers.length - 1].id + 1,
+      // ...body,
+      ...data,
+    };
 
-    const { body } = request; //contains all the fields
-    const newUser = new User(body);
-
-    //save the user to the DB
-    try{
-      const savedUser = await newUser.save();
-      return response.status(201).send(savedUser);
-    }catch(err){
-      console.log(err);
-      return response.sendStatus(400);
-    }
+    mockUsers.push(newUser);
+    return response.status(201).send(newUser);
+    // return response.send(200);
   }
 );
 

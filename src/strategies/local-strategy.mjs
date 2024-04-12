@@ -7,23 +7,25 @@ import { mockUsers } from "../utils/constants.mjs";
 passport.serializeUser((user, done) => {
   console.log(`Inside Serialize User`);
   console.log(user);
-  done(null, user.id);
+  // done(null, user.id);
+  done(null, user.username);
 });
 
 //
-passport.deserializeUser((id, done) => {
-
+passport.deserializeUser((username, done) => {
   console.log(`Inside Deserializer`);
-  console.log(`Deserializing User ID: ${id}`);
+  // console.log(`Deserializing User ID: ${id}`);
   //search for the user either in the database or the array that we've created
   try {
-    const findUser = mockUsers.find((user) => user.id === id);
+    // const findUser = mockUsers.find((user) => user.id === id);
+    const findUser = mockUsers.find((user) => user.username === username);
     if (!findUser) throw new Error("User not found!");
-    done(null, findUser); 
-    
-    //done(null, user) is used to signal successful authentication 
+    done(null, findUser);
+
+    //done(null, user) is used to signal successful authentication
     //and pass the authenticated user to the next step in the process.
-  } catch (err) { //if the user is NOT found
+  } catch (err) {
+    //if the user is NOT found
     done(err, null);
   }
 });
